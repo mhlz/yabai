@@ -48,6 +48,8 @@ struct bar
     struct bar_line clock_icon;
     struct bar_line battr_icon;
     struct bar_line power_icon;
+    struct bar_line wifi_icon;
+    struct bar_line no_wifi_icon;
     struct bar_line space_underline;
     struct bar_line power_underline;
     struct bar_line clock_underline;

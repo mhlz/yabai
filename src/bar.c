@@ -1,4 +1,5 @@
 #include "bar.h"
+#include "CoreWLAN/CoreWLAN.h"
 
 extern struct space_manager g_space_manager;
 
@@ -205,6 +206,8 @@ void bar_refresh(struct bar *bar)
     }
 
     // BAR RIGHT
+
+
     time_t rawtime;
     time(&rawtime);
     float time_line_width = 0;
@@ -232,6 +235,7 @@ void bar_refresh(struct bar *bar)
     bool has_batt = false;
     bool charging = false;
     int percent = bar_find_battery_life(&has_batt, &charging);
+    float time_batt_width = 0;
     if (has_batt) {
         char batt[255];
         snprintf(batt, sizeof(batt), "%' '3d%%", percent);
@@ -251,6 +255,51 @@ void bar_refresh(struct bar *bar)
         bar_draw_line(bar, batt_icon, pi_pos.x, pi_pos.y);
         bar_draw_line(bar, bar->power_underline, pu_pos.x, pu_pos.y);
         bar_destroy_line(batt_line);
+
+        time_batt_width = time_line_width + batt_line.bounds.size.width;
+    }
+
+    CWWiFiClient* client = CWWiFiClient.sharedWiFiClient;
+    if (client) {
+        CWInterface* interface = client.interface;
+        if (interface) {
+            char wifi_name[255];
+            bool wifi;
+            NSString* ns_name = interface.ssid;
+            if (ns_name) {
+                const char* name = interface.ssid.UTF8String;
+                wifi = true;
+                snprintf(wifi_name, sizeof(wifi_name), "%s", name);
+            } else {
+                wifi = false;
+                snprintf(wifi_name, sizeof(wifi_name), "---");
+            }
+
+            struct bar_line wifi_line = bar_prepare_line(bar->t_font, wifi_name, bar->foreground_color);
+            CGPoint w_pos = bar_align_line(bar, wifi_line, ALIGN_RIGHT, ALIGN_CENTER);
+            w_pos.x = w_pos.x - time_batt_width - bar->power_underline.bounds.size.width - bar->clock_underline.bounds.size.width - 20;
+
+            struct bar_line wifi_icon_line = wifi ? bar->wifi_icon : bar->no_wifi_icon;
+            CGPoint wi_pos = bar_align_line(bar, wifi_icon_line, 0 , ALIGN_CENTER);
+            wi_pos.x = w_pos.x - bar->wifi_icon.bounds.size.width - 5;
+            wi_pos.y += 1;
+
+            char underline[255];
+            int name_len = strlen(wifi_name);
+            int underline_len = name_len >= 254 ? 254 : strlen(wifi_name) + 4;
+            memset(underline, 0, sizeof(underline));
+            memset(underline, '_', underline_len * sizeof(char));
+
+            struct bar_line wifi_underline = bar_prepare_line(bar->t_font, underline, rgba_color_from_hex(0xff7295e7));
+            CGPoint wu_pos = bar_align_line(bar, wifi_underline, 0, ALIGN_BOTTOM);
+            wu_pos.x = wi_pos.x - 6;
+
+            bar_draw_line(bar, wifi_icon_line, wi_pos.x, wi_pos.y);
+            bar_draw_line(bar, wifi_underline, wu_pos.x, wu_pos.y);
+            bar_draw_line(bar, wifi_line, w_pos.x, w_pos.y);
+            bar_destroy_line(wifi_line);
+            bar_destroy_line(wifi_underline);
+        }
     }
 
     CGContextFlush(bar->context);
@@ -327,6 +376,18 @@ void bar_set_text_font(struct bar *bar, char *font_string)
     bar_refresh(bar);
 }
 
+void bar_set_wifi_icon(struct bar *bar, char *wifi_icon, char *no_wifi_icon) {
+    if (bar->wifi_icon.line) {
+        bar_destroy_line(bar->wifi_icon);
+    }
+    if (bar->no_wifi_icon.line) {
+        bar_destroy_line(bar->no_wifi_icon);
+    }
+
+    bar->wifi_icon = bar_prepare_line(bar->i_font, wifi_icon, rgba_color_from_hex(0xff7295e7));
+    bar->no_wifi_icon = bar_prepare_line(bar->i_font, no_wifi_icon, rgba_color_from_hex(0xff7295e7));
+}
+
 void bar_set_icon_font(struct bar *bar, char *font_string)
 {
     if (bar->i_font) {
@@ -346,6 +407,7 @@ void bar_set_icon_font(struct bar *bar, char *font_string)
     if (bar->_power_icon_strip) bar_set_power_strip(bar, bar->_power_icon_strip);
     if (bar->_clock_icon) bar_set_clock_icon(bar, bar->_clock_icon);
     if (bar->_space_icon) bar_set_space_icon(bar, bar->_space_icon);
+    bar_set_wifi_icon(bar, "直", "睊");
     bar_refresh(bar);
 }
 
